@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Octolytics</title>
+	<script src="http://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+</head>
+<body>
+	<form>
+        <input id="github-user" type="text" name="github-user" placeholder="Enter your Github username" autofocus class="form-control input-lg search-field">
+        <input id="search-btn" type="submit" value="Search" class="btn btn-lg btn-primary">
+    </form>
+	<script type="text/javascript">
+		$(function(){
+			$("#search-btn").click(function(){
+				var githubUser = $("#github-user").val();
+			});
+		});
+	</script>
+</body>
+</html>
