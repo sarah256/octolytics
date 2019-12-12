@@ -63,22 +63,31 @@ def get_lines_from_commit(commit_hash, file_type):
     :param String file_type: Type of file we are looking for (i.e. py)
     """
     # Build out args
-    raw_args = f"git diff --numstat {commit_hash}"
+    raw_args = f"git log {commit_hash} --numstat"
 
     # Parse our args
     new_args = shlex.split((raw_args))
 
     try:
-        # Call the git module
+        # Call the git module to get the number of lines changed
         response = str(subprocess.run(new_args, stdout=subprocess.PIPE).stdout)
+
+        # Only calculate numbers that are in this commit
+        # To limit, find the starting point of the next commit
+        next_commit = ""
+        if len(re.findall("commit [a-zA-Z0-9]+", response)) > 1:
+            next_commit = re.findall("commit [a-zA-Z0-9]+", response)[1]
 
         # Loop over the files, adding lines if they mach file_type
         total_lines = 0
-        for file in response.split('\n'):
-            if file_type in file:
+        for line in response.split('\\n'):
+            # Check if we've passed our next commit
+            if next_commit in line:
+                break
+            if file_type in line:
                 # Extract the number of lines added (i.e. the first number)
-                if re.search(f"[0-9]+", file):
-                    total_lines += int(re.search('[0-9]+', file)[0])
+                if re.search(f"[0-9]+", line):
+                    total_lines += int(re.search('[0-9]+', line)[0])
         return total_lines
     except Exception as e:
         print(f"Something went wrong when getting the lines for hash {commit_hash}")
@@ -87,5 +96,8 @@ def get_lines_from_commit(commit_hash, file_type):
 if __name__ == "__main__":
     ret = get_commits('Sidhartha\ Premkumar')
 
-    ret = get_lines_from_commit(ret[0], 'py')
-    print(ret)
+    total_lines = 0
+    for resp in ret:
+        total_lines += get_lines_from_commit(resp, 'py')
+    # ret = get_lines_from_commit(ret[0], 'py')
+    print(total_lines)
