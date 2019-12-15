@@ -1,5 +1,21 @@
 <b>Hello {{ data['username'] }}</b>
 <br>
+<form action="/add_alias" method="POST">
+  <input type="text" name="alias" value="some@email.com">
+  <input type="submit" value="Submit">
+</form>
+{% if data['alias'] %}
+  <p>You have the following alias'</p>
+  <p>
+  {% for alias in data['alias'] %}
+      {{ alias }}
+      {% if loop.index != loop.length %}
+          ,
+      {% endif %}
+  {% endfor %}
+  </p>
+{% endif %}
+<br>
 {% if data['repos'] %}
   <p>
   {% for repo_name, repo_url in data['repos'].items() %}

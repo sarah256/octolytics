@@ -35,33 +35,32 @@ FILE_TYPES = {
 class GitClient(object):
     """Git object we are using to represent interactions with git."""
 
-    def get_lines_for_repo(self, repo, username):
+    def get_lines_for_repo(self, emails):
         """
         Get the total number of lines a user contributed to a repo by their
         file type.
 
-        :param str repo: URL of git repo
-        :param str username: the user we want data on
+        :param list(str) emails: The emails we're looking at
         :rtype: dict
         :return: dictionary with file types as keys, and line counts as values
         """
         line_counts = {}
-        commits = get_commits(username)
+        commits = get_latest_commits(emails)
 
+        # For each commit hash, check if it should be counted
         for commit_hash in commits:
             for file_type in FILE_TYPES.keys():
-                # import pdb; pdb.set_trace()
-                lines = get_lines_from_commit(commit_hash, file_type)
+                lines = get_lines_from_commit(commit_hash, file_type, emails)
                 line_counts[file_type] = lines
         
         return line_counts
 
-    def get_all_lines(self, username, repos):
+    def get_all_lines(self, emails, repos):
         """
         Get the total number of lines a user contributed to all repos, by file
         type.
 
-        :param str username: Username we're looking at
+        :param list(str) emails: List of emails we're looking at
         :param Dict repos: List of repo_name, repo_url from user
         :rtype Dict:
         :returns: Dict of calculated data: {'judymoses.github.io': {'.py': 50}}
@@ -76,21 +75,30 @@ class GitClient(object):
         # Loop over the repos and save
         repo_data = {}
         for repo_name, repo_url in repos.items():
-
             # Clone .git file
             clone_git_folder(repo_url)
 
             # Change directory
             os.chdir(repo_name)
 
-            repo_data[repo_name] = self.get_lines_for_repo(repo_url, username)
+            repo_data[repo_name] = self.get_lines_for_repo(emails)
 
             # Get out and delete
             os.chdir("..")
             shutil.rmtree(repo_name)
-        
+
         # Get out of temp
         os.chdir("..")
+
+        # We need to update "ALL" in repo_data
+        repo_data["ALL"] = FILE_TYPES
+        for repo_name, repo_stats in repo_data.items():
+            for file_type in FILE_TYPES.keys():
+                if type(repo_data["ALL"][file_type]) is int:
+                    repo_data["ALL"][file_type] += repo_stats.get(file_type, 0)
+                else:
+                    repo_data["ALL"][file_type] = repo_stats.get(file_type, 0)
+
         return repo_data
 
 
@@ -115,73 +123,96 @@ def clone_git_folder(url):
         print(f"Something went wrong cloning the git folder for url: {url}")
 
 
-def get_commits(author, start_date=START_DATE):
+def get_latest_commits(emails, start_date=START_DATE):
     """
-    Gets all commits for an author
+    Gets all commits for an all alias (emails)
 
-    :param String author: Author who we are looking for
+    :param list(str) emails: Emails who we are looking for
     :param datetime start_date: The start date (in months) we go back
     :rtype: list(str)
     :return: list of commit hashes
     """
     # Build our args
-    raw_args = f"git log --date=short --reverse --all " \
-                f"--since={start_date.month}.months.ago --author={author}"
+    raw_args = f"git log --date=short --all " \
+                f"--since={start_date.month}.months.ago  --pretty=format:\"%ae;%H\""
 
     # Parse our args
     new_args = shlex.split((raw_args))
 
+    # Check if its the email we're looking for
     try:
         # Call the git module
         response = str(subprocess.run(new_args, stdout=subprocess.PIPE).stdout)
+        # Loop and check if its the email, add commit
+        commits = []
+        for line in response.split("\\n"):
+            if line[0:line.find(';')] in emails:
+                # Extract out all the commits and return
+                commits.append(line[line.find(';')+1:])
+                break
 
-        # Extract out all the commits and return
-        commits_unformatted = re.findall("commit [a-zA-Z0-9]+", response)
+        return commits
 
-        # Return formatted commits
-        return [x[7:] for x in commits_unformatted]
     except Exception as e:
-        print(f"Something went wrong getting commits for {author}")
+        print(f"Something went wrong getting commits for alias' {emails}\n{e}")
+        return []
 
 
-def get_lines_from_commit(commit_hash, file_type):
+def get_lines_from_commit(commit_hash, file_type, emails):
     """
     Get lines added for a specific file_type and commit_hash
 
+    :param list(str) emails: Emails who we are looking for
     :param String commit_hash: Author who we are looking for
     :param String file_type: Type of file we are looking for (i.e. py)
     """
     # Build out args
-    raw_args = f"git log {commit_hash} --numstat"
+    commit_hash = commit_hash.replace("'", "")
+    raw_args = f"git log {commit_hash} --numstat " \
+               f"--pretty=\"%ae---\" --since={START_DATE.month}.months.ago"
 
     # Parse our args
     new_args = shlex.split((raw_args))
 
     try:
         # Call the git module to get the number of lines changed
-        response = str(subprocess.run(new_args, stdout=subprocess.PIPE).stdout)
+        response = subprocess.Popen(new_args, stdout=subprocess.PIPE, encoding='utf-8',)
 
-        # Only calculate numbers that are in this commit
-        # To limit, find the starting point of the next commit
-        next_commit = ""
-        if len(re.findall("commit [a-zA-Z0-9]+", response)) > 1:
-            next_commit = re.findall("commit [a-zA-Z0-9]+", response)[1]
-
-        # Loop over the files, adding lines if they mach file_type
+        # Loop over files and count lines
         total_lines = 0
-        for line in response.split('\\n'):
-            # Check if we've passed our next commit
-            if next_commit in line:
+        add_to_lines = False
+        while True:
+            line = response.stdout.readline()
+            if not line:
                 break
-            if line.endswith(file_type):
-                #TODO: handle case when commit message may end in file extension
-                # Extract the number of lines added (i.e. the first number)
-                if re.search(f"[0-9]+", line):
-                    total_lines += int(re.search('[0-9]+', line)[0])
+            line = line.replace("\n", "").replace("\t", " ")
+            if check_line_for_emails(line, emails):
+                add_to_lines = True
+            elif '---' in line:
+                add_to_lines = False
+            if add_to_lines and '---' not in line and line.endswith(file_type):
+                # Get the first number and add to total_lines
+                total_lines += int(line.split(" ")[0])
+
         return total_lines
     except Exception as e:
-        print(f"Something went wrong when getting the lines for hash {commit_hash}")
+        print(f"Something went wrong when getting the lines for hash {commit_hash}. \n Exception: {e}")
         return -1
+
+
+def check_line_for_emails(line, emails):
+    """
+    Helper function to see if any email is in the line
+
+    :param str line: Output line
+    :param list(str) emails: List of emails we're looking for
+    :rtype Boolean:
+    :return: True/False
+    """
+    for email in emails:
+        if email in line:
+            return True
+    return False
 
 
 # if __name__ == "__main__":
