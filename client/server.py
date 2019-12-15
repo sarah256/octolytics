@@ -115,7 +115,7 @@ def get_repos():
         # Create the user document
         print(f"[FLASK]: This should not happen. User: {username}")
         render_template('error.html', status_code=500)
-    return render_template('index.html')
+    return redirect('dashboard.html')
 
 if __name__ == "__main__":
     app.run(ssl_context='adhoc')

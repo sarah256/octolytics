@@ -1,5 +1,16 @@
 <b>Hello {{ data['username'] }}</b>
 <br>
-<form action="/get_repos">
-    <input type="submit" value="Get Repos" />
-</form>
+{% if data['repos'] %}
+  <p>
+  {% for repo_name, repo_url in data['repos'].items() %}
+      {{ repo_name }}
+      {% if loop.index != loop.length %}
+          ,
+      {% endif %}
+  {% endfor %}
+  </p>
+{% else %}
+  <form action="/get_repos">
+      <input type="submit" value="Get Repos" />
+  </form>
+{% endif %}
