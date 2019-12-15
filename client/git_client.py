@@ -1,5 +1,6 @@
 # Built-In Modules
 import os
+import shutil
 import shlex
 from datetime import datetime, timedelta
 import subprocess
@@ -60,25 +61,41 @@ class GitClient(object):
             for file_type in FILE_TYPES.keys():
                 lines = get_lines_from_commit(commit_hash, file_type)
                 line_counts[file_type] = lines
-    
-    def get_all_lines(self, username, repos):
+
+
+    def get_all_lines(self, repos):
         """
         Get the total number of lines a user contributed to all repos, by file
         type.
 
-        :param str username: username of user
-        :param
+        :param Dict repos: List of repo_name, repo_url from user
+        :rtype Dict:
+        :returns: Dict of calculated data: {'judymoses.github.io': {'.py': 50}}
         """
-        if not str(subprocess.run(['pwd'], stdout=subprocess.PIPE).stdout).endswith('/temp'):
-            # Build our args
-            raw_args = "cd "
-
-            # Parse our args
-            new_args = shlex.split(raw_args)
+        if "/temp" not in str(subprocess.run(['pwd'], stdout=subprocess.PIPE).stdout):
+            # Change directory
             os.chdir("client/temp/")
 
-            response = str(subprocess.run(new_args, stdout=subprocess.PIPE).stdout)
-            import pdb; pdb.set_trace()
+            if "/temp" not in str(subprocess.run(['pwd'], stdout=subprocess.PIPE).stdout):
+                raise Exception("Cant cd into /temp Folder")
+
+        # Loop over the repos and save
+        repo_data = {}
+        for repo_name, repo_url in repos.items():
+
+            # Clone .git file
+            clone_git_folder(repo_url)
+
+            # Change directory
+            os.chdir(repo_name)
+
+            # repo_data[repo_name] = self.get_lines_for_repo(username)
+            repo_data[repo_name] = {'.py': 50}
+            # Get out and delete
+            os.chdir("..")
+            shutil.rmtree(repo_name)
+        #
+        return repo_data
 
 
 def clone_git_folder(url):
@@ -102,7 +119,7 @@ def clone_git_folder(url):
         print(f"Something went wrong cloning the git folder for url: {url}")
 
 
-def get_commits(author, repo, start_date=START_DATE):
+def get_commits(author, start_date=START_DATE):
     """
     Gets all commits for an author
 
@@ -179,4 +196,4 @@ if __name__ == "__main__":
     # # ret = get_lines_from_commit(ret[0], 'py')
     # print(total_lines)
     client = GitClient()
-    client.get_lines_for_user('url')
+    client.get_all_lines('sidpremkumar', {'judymoses.github.io': 'git://github.com/judymoses/judymoses.github.io.git'})
