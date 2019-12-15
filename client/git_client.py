@@ -57,13 +57,24 @@ class GitClient(object):
         
         return line_counts
     
-    def get_lines_for_user(self, username):
+    def get_all_lines(self, username, repos):
         """
         Get the total number of lines a user contributed to all repos, by file
         type.
 
-        :param str username: username of user 
+        :param str username: username of user
+        :param
         """
+        if not str(subprocess.run(['pwd'], stdout=subprocess.PIPE).stdout).endswith('/temp'):
+            # Build our args
+            raw_args = "cd "
+
+            # Parse our args
+            new_args = shlex.split(raw_args)
+            os.chdir("client/temp/")
+
+            response = str(subprocess.run(new_args, stdout=subprocess.PIPE).stdout)
+            import pdb; pdb.set_trace()
 
 
 def clone_git_folder(url):
@@ -85,6 +96,7 @@ def clone_git_folder(url):
         # TODO:
     except Exception as e:
         print(f"Something went wrong cloning the git folder for url: {url}")
+
 
 def get_commits(author, repo, start_date=START_DATE):
     """
@@ -113,6 +125,7 @@ def get_commits(author, repo, start_date=START_DATE):
         return [x[7:] for x in commits_unformatted]
     except Exception as e:
         print(f"Something went wrong getting commits for {author}")
+
 
 def get_lines_from_commit(commit_hash, file_type):
     """
@@ -152,11 +165,14 @@ def get_lines_from_commit(commit_hash, file_type):
         print(f"Something went wrong when getting the lines for hash {commit_hash}")
         return -1
 
-if __name__ == "__main__":
-    ret = get_commits('srieger')
 
-    total_lines = 0
-    for resp in ret:
-        total_lines += get_lines_from_commit(resp, 'py')
-    # ret = get_lines_from_commit(ret[0], 'py')
-    print(total_lines)
+if __name__ == "__main__":
+    # ret = get_commits('srieger')
+    #
+    # total_lines = 0
+    # for resp in ret:
+    #     total_lines += get_lines_from_commit(resp, 'py')
+    # # ret = get_lines_from_commit(ret[0], 'py')
+    # print(total_lines)
+    client = GitClient()
+    client.get_lines_for_user('url')
