@@ -8,6 +8,30 @@ import re
 # Global Variables
 START_DATE = datetime.today() - timedelta(days=365)
 
+def class GitClient(object):
+    """Git Object we are using to represent interactions with git."""
+
+    def get_lines_from_repo(self, repo):
+            """
+            Uses static method clone_git_folder to clone url into temp folder
+
+            :param String repo: URL of a git repo
+            """
+            # cd into the temp folder if we're not there already
+
+            # Clone the repo
+
+            # cd into the new repo
+
+            # Get our total_lines
+
+            # cd into temp folder
+
+            # Delete our new repo
+
+            # Return total_lines
+
+
 
 def clone_git_folder(url):
     """
@@ -94,7 +118,7 @@ def get_lines_from_commit(commit_hash, file_type):
         return -1
 
 if __name__ == "__main__":
-    ret = get_commits('Sidhartha\ Premkumar')
+    ret = get_commits('srieger')
 
     total_lines = 0
     for resp in ret:
