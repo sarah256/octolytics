@@ -38,30 +38,23 @@ FILE_TYPES = {
 class GitClient(object):
     """Git Object we are using to represent interactions with git."""
 
-    def get_lines_for_repo(self, repo):
+    def get_lines_for_repo(self, repo, username):
         """
         Get the total number of lines a user contributed to a repo by their
         file type.
 
         :param str repo: URL of git repo
-        :param str file_type: the extension of the file type, without the '.'
+        :param str username: the user we want data on
         :rtype: dict
         :return: dictionary with file types as keys, and line counts as values
         """
-        # cd into the temp folder if we're not there already
-        # Call the git module
-        # Clone the repo
-        # cd into the new repo
-        # Get our total_lines
-        # cd into temp folder
-        # Delete our new repo
-        # Return total_lines
         line_counts = {}
+        commits = get_commits(username, repo)
+
         for commit_hash in commits:
             for file_type in FILE_TYPES.keys():
                 lines = get_lines_from_commit(commit_hash, file_type)
                 line_counts[file_type] = lines
-
 
     def get_all_lines(self, repos):
         """
