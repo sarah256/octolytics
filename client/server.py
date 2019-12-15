@@ -1,6 +1,9 @@
 # Built-In Modules
 import os
 
+# Local Modules
+from git_client import GitClient
+
 # 3rd Party Modules
 from flask import Flask, render_template, request, url_for, redirect
 from flask_dance.contrib.github import make_github_blueprint, github
@@ -28,8 +31,12 @@ db_client = db.octolytics_data
 DATABASE_SCHEMA = {
     'username': None,
     'repos': None,
+    # repo: { repo_name, repo_url }
+    'repo_data': None,
+    # repo_data: {'judymoses.github.io': {'.py': 50}}
 }
-
+# Create our git_client object
+git_client = GitClient()
 
 @app.route("/", methods=['GET'])
 def index():
@@ -85,6 +92,35 @@ def login():
     return redirect('/dashboard')
 
 
+@app.route("/sync_repos", methods=['GET'])
+def sync_repos():
+    """Sync our authenticaed user"""
+    # Get their repo information
+    resp = github.get("/user")
+    if not resp.ok:
+        render_template('error.html', status_code=300)
+    resp = resp.json()
+    username = resp['login']
+
+    # Add/update database
+    user_data = db_client.find_one({"username": username})
+    if not user_data:
+        # Throw an error
+        print(f"[FLASK]: This should not happen. User: {username}")
+        render_template('error.html', status_code=500)
+    if not user_data['repo_data']:
+        # Update a users data
+        try:
+            user_data['repo_data'] = git_client.get_all_lines(username, user_data['repos'])
+            db_client.update_one({'username': username}, {"$set": user_data}, upsert=False)
+            return redirect('/dashboard')
+        except:
+            print(f"[GITCLIENT]: Something went wrong when syncing {username}")
+            return render_template('error.html', status_code=487)
+    else:
+        return redirect('/dashboard')
+
+
 @app.route("/get_repos", methods=['GET'])
 def get_repos():
     """Endpoint to get all repos and store in DB"""
@@ -117,6 +153,7 @@ def get_repos():
         # Create the user document
         print(f"[FLASK]: This should not happen. User: {username}")
         render_template('error.html', status_code=500)
+
     return redirect('dashboard.html')
 
 

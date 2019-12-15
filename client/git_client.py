@@ -6,9 +6,6 @@ from datetime import datetime, timedelta
 import subprocess
 import re
 
-# Local Modules
-import server
-
 # Global Variables
 START_DATE = datetime.today() - timedelta(days=365)
 FILE_TYPES = {
@@ -56,11 +53,12 @@ class GitClient(object):
                 lines = get_lines_from_commit(commit_hash, file_type)
                 line_counts[file_type] = lines
 
-    def get_all_lines(self, repos):
+    def get_all_lines(self, username, repos):
         """
         Get the total number of lines a user contributed to all repos, by file
         type.
 
+        :param str username: Username we're looking at
         :param Dict repos: List of repo_name, repo_url from user
         :rtype Dict:
         :returns: Dict of calculated data: {'judymoses.github.io': {'.py': 50}}
@@ -123,7 +121,7 @@ def get_commits(author, start_date=START_DATE):
     """
     # Build our args
     raw_args = f"git log --date=short --reverse --all " \
-                f"--since={START_DATE.month}.months.ago --author={author}"
+                f"--since={start_date.month}.months.ago --author={author}"
 
     # Parse our args
     new_args = shlex.split((raw_args))
@@ -180,13 +178,13 @@ def get_lines_from_commit(commit_hash, file_type):
         return -1
 
 
-if __name__ == "__main__":
-    # ret = get_commits('srieger')
-    #
-    # total_lines = 0
-    # for resp in ret:
-    #     total_lines += get_lines_from_commit(resp, 'py')
-    # # ret = get_lines_from_commit(ret[0], 'py')
-    # print(total_lines)
-    client = GitClient()
-    client.get_all_lines('sidpremkumar', {'judymoses.github.io': 'git://github.com/judymoses/judymoses.github.io.git'})
+# if __name__ == "__main__":
+#     # ret = get_commits('srieger')
+#     #
+#     # total_lines = 0
+#     # for resp in ret:
+#     #     total_lines += get_lines_from_commit(resp, 'py')
+#     # # ret = get_lines_from_commit(ret[0], 'py')
+#     # print(total_lines)
+#     client = GitClient()
+#     client.get_all_lines('sidpremkumar', {'judymoses.github.io': 'git://github.com/judymoses/judymoses.github.io.git'})
