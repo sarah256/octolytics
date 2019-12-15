@@ -3,6 +3,7 @@ import os
 
 # Local Modules
 from client.git_client import GitClient
+from client.badge_maker import BadgeMaker
 
 # 3rd Party Modules
 from flask import Flask, render_template, request, url_for, redirect
@@ -38,6 +39,7 @@ DATABASE_SCHEMA = {
 }
 # Create our git_client object
 git_client = GitClient()
+badge_maker = BadgeMaker()
 
 @app.route("/", methods=['GET'])
 def index():
@@ -188,6 +190,22 @@ def get_repos():
         render_template('error.html', status_code=500)
     return redirect('/dashboard')
 
+@app.route("/badge", methods=['GET'])
+def badge():
+    """Endpoint to badge for a certain user in our repo"""
+    # Extract the user from the url
+    username = request.args.get('username')
+    file_type = request.args.get('file_type')
+
+    # Find the user in our database, if not return error badge
+    user_data = db_client.find_one({"username": username})
+    if user_data and user_data.get('repo_data', {}).get('ALL', None):
+        # Make and return the badge
+        user_badge = badge_maker.make_badge(user_data.get('repo_data').get('ALL'), file_type)
+        return user_badge
+    else:
+        # TODO: Change this to error badge image
+        return redirect('/')
 
 if __name__ == "__main__":
     app.run(ssl_context='adhoc')
