@@ -6,37 +6,34 @@ from datetime import datetime, timedelta
 import subprocess
 import re
 
-# Local Modules
-import server
-
 # Global Variables
 START_DATE = datetime.today() - timedelta(days=365)
 FILE_TYPES = {
-    'py': 'Python',
-    'java': 'Java',
-    'c': 'C',
-    'cpp': 'C++',
-    'go': 'Go',
-    'html': 'HTML',
-    'css': 'CSS',
-    'js': 'JavaScript',
-    'php': 'PHP',
-    'ruby': 'Ruby',
-    'cs': 'C#',
-    'ts': 'TypeScript',
-    'sh': 'Shell',
-    'swift': 'Swift',
-    'sc': 'Scala',
-    'scala': 'Scala',
-    'h': 'Objective C',
-    'm': 'Objective C',
-    'mm': 'Objective C',
-    'M': 'Objective C',
+    '.py': 'Python',
+    # '.java': 'Java',
+    # '.c': 'C',
+    # '.cpp': 'C++',
+    # '.go': 'Go',
+    # '.html': 'HTML',
+    # '.css': 'CSS',
+    # '.js': 'JavaScript',
+    # '.php': 'PHP',
+    # '.ruby': 'Ruby',
+    # '.cs': 'C#',
+    # '.ts': 'TypeScript',
+    # '.sh': 'Shell',
+    # '.swift': 'Swift',
+    # '.sc': 'Scala',
+    # '.scala': 'Scala',
+    # '.h': 'Objective C',
+    # '.m': 'Objective C',
+    # '.mm': 'Objective C',
+    # '.M': 'Objective C',
 }
 
 
 class GitClient(object):
-    """Git Object we are using to represent interactions with git."""
+    """Git object we are using to represent interactions with git."""
 
     def get_lines_for_repo(self, repo, username):
         """
@@ -55,8 +52,10 @@ class GitClient(object):
             for file_type in FILE_TYPES.keys():
                 lines = get_lines_from_commit(commit_hash, file_type)
                 line_counts[file_type] = lines
+        
+        return line_counts
 
-    def get_all_lines(self, repos):
+    def get_all_lines(self, repos, username):
         """
         Get the total number of lines a user contributed to all repos, by file
         type.
@@ -82,12 +81,12 @@ class GitClient(object):
             # Change directory
             os.chdir(repo_name)
 
-            # repo_data[repo_name] = self.get_lines_for_repo(username)
-            repo_data[repo_name] = {'.py': 50}
+            repo_data[repo_name] = self.get_lines_for_repo(repo_url, username)
+
             # Get out and delete
             os.chdir("..")
             shutil.rmtree(repo_name)
-        #
+        
         return repo_data
 
 
@@ -170,7 +169,8 @@ def get_lines_from_commit(commit_hash, file_type):
             # Check if we've passed our next commit
             if next_commit in line:
                 break
-            if file_type in line:
+            if line.endswith(file_type):
+                #TODO: handle case when commit message may end in file extension
                 # Extract the number of lines added (i.e. the first number)
                 if re.search(f"[0-9]+", line):
                     total_lines += int(re.search('[0-9]+', line)[0])
