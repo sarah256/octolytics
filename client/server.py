@@ -30,12 +30,14 @@ DATABASE_SCHEMA = {
     'repos': None,
 }
 
+
 @app.route("/", methods=['GET'])
 def index():
     """This is our front page"""
     if github.authorized:
         return redirect('/dashboard')
     return render_template('index.html')
+
 
 @app.route("/dashboard", methods=['GET'])
 def dashboard():
@@ -67,6 +69,7 @@ def dashboard():
 
     return render_template('dashboard.html',
                             data=data,)
+
 
 @app.route("/login", methods=['GET'])
 def login():
@@ -115,6 +118,7 @@ def get_repos():
         print(f"[FLASK]: This should not happen. User: {username}")
         render_template('error.html', status_code=500)
     return redirect('dashboard.html')
+
 
 if __name__ == "__main__":
     app.run(ssl_context='adhoc')
