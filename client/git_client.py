@@ -69,7 +69,6 @@ class GitClient(object):
         """
 
 
-
 def clone_git_folder(url):
     """
     Clones just the .git folder of a url
