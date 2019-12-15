@@ -9,8 +9,21 @@
       {% endif %}
   {% endfor %}
   </p>
+  <form action="/sync_repos">
+    <input type="submit" value="Sync Repos" />
+  </form>
 {% else %}
   <form action="/get_repos">
       <input type="submit" value="Get Repos" />
   </form>
+{% endif %}
+{% if data['repo_data'] %}
+  <p>
+  {% for file_type, lines in data['repo_data'].items() %}
+      {{ file_type }} - {{ lines }} lines
+      {% if loop.index != loop.length %}
+          ,
+      {% endif %}
+  {% endfor %}
+  </p>
 {% endif %}

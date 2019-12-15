@@ -46,20 +46,22 @@ class GitClient(object):
         :return: dictionary with file types as keys, and line counts as values
         """
         line_counts = {}
-        commits = get_commits(username, repo)
+        commits = get_commits(username)
 
         for commit_hash in commits:
             for file_type in FILE_TYPES.keys():
+                # import pdb; pdb.set_trace()
                 lines = get_lines_from_commit(commit_hash, file_type)
                 line_counts[file_type] = lines
         
         return line_counts
 
-    def get_all_lines(self, repos, username):
+    def get_all_lines(self, username, repos):
         """
         Get the total number of lines a user contributed to all repos, by file
         type.
 
+        :param str username: Username we're looking at
         :param Dict repos: List of repo_name, repo_url from user
         :rtype Dict:
         :returns: Dict of calculated data: {'judymoses.github.io': {'.py': 50}}
@@ -87,6 +89,8 @@ class GitClient(object):
             os.chdir("..")
             shutil.rmtree(repo_name)
         
+        # Get out of temp
+        os.chdir("..")
         return repo_data
 
 
@@ -122,7 +126,7 @@ def get_commits(author, start_date=START_DATE):
     """
     # Build our args
     raw_args = f"git log --date=short --reverse --all " \
-                f"--since={START_DATE.month}.months.ago --author={author}"
+                f"--since={start_date.month}.months.ago --author={author}"
 
     # Parse our args
     new_args = shlex.split((raw_args))
@@ -180,13 +184,13 @@ def get_lines_from_commit(commit_hash, file_type):
         return -1
 
 
-if __name__ == "__main__":
-    # ret = get_commits('srieger')
-    #
-    # total_lines = 0
-    # for resp in ret:
-    #     total_lines += get_lines_from_commit(resp, 'py')
-    # # ret = get_lines_from_commit(ret[0], 'py')
-    # print(total_lines)
-    client = GitClient()
-    client.get_all_lines('sidpremkumar', {'judymoses.github.io': 'git://github.com/judymoses/judymoses.github.io.git'})
+# if __name__ == "__main__":
+#     # ret = get_commits('srieger')
+#     #
+#     # total_lines = 0
+#     # for resp in ret:
+#     #     total_lines += get_lines_from_commit(resp, 'py')
+#     # # ret = get_lines_from_commit(ret[0], 'py')
+#     # print(total_lines)
+#     client = GitClient()
+#     client.get_all_lines('sidpremkumar', {'judymoses.github.io': 'git://github.com/judymoses/judymoses.github.io.git'})
