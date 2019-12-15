@@ -2,6 +2,7 @@ import requests
 import datetime
 import dateutil.parser
 import json
+from git_client import get_lines_from_commit, get_commits
 
 
 class LanguageLineCount():
@@ -9,6 +10,7 @@ class LanguageLineCount():
 	A class containing the functions for counting the number of
 	lines a user has written in different languages.
 	"""
+	languages = []
 
 	def get_commits(self, username):
 		"""
@@ -18,29 +20,7 @@ class LanguageLineCount():
 		:return: list of URLs to JSON data for each commit
 		:rtype: list
 		"""
-		year_ago = datetime.datetime.now() - datetime.timedelta(days=365)
-		date = datetime.datetime.now()
-		commits = []
-		page = 1
-
-		while date != year_ago:
-			url = 'https://api.github.com/users/{0}/events?page={1}'.format(username, page)
-			response = requests.get(url)
-			events = json.loads(response.text)
-
-			for event in events:
-				if event['type'] == 'PushEvent':
-					pushed_commits = event['payload']['commits']
-					for commit in pushed_commits:
-						commits.append(commit['url'])
-			# import pdb;pdb.set_trace()
-			print(type(events))
-			last_event = events[-1]
-			created_at = last_event['created_at']
-			date = dateutil.parser.parse(created_at)
-			page += 1
-
-		return commits
+		
 
 	def get_line_counts(self, commits):
 		"""

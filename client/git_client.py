@@ -1,35 +1,72 @@
-# Build-In Modules
+# Built-In Modules
 import os
 import shlex
 from datetime import datetime, timedelta
 import subprocess
 import re
 
+# Local Modules
+import server
+
 # Global Variables
 START_DATE = datetime.today() - timedelta(days=365)
+FILE_TYPES = {
+    'py': 'Python',
+    'java': 'Java',
+    'c': 'C',
+    'cpp': 'C++',
+    'go': 'Go',
+    'html': 'HTML',
+    'css': 'CSS',
+    'js': 'JavaScript',
+    'php': 'PHP',
+    'ruby': 'Ruby',
+    'cs': 'C#',
+    'ts': 'TypeScript',
+    'sh': 'Shell',
+    'swift': 'Swift',
+    'sc': 'Scala',
+    'scala': 'Scala',
+    'h': 'Objective C',
+    'm': 'Objective C',
+    'mm': 'Objective C',
+    'M': 'Objective C',
+}
 
-def class GitClient(object):
+
+class GitClient(object):
     """Git Object we are using to represent interactions with git."""
 
-    def get_lines_from_repo(self, repo):
+    def get_lines_for_repo(self, repo):
         """
-        Uses static method clone_git_folder to clone url into temp folder
+        Get the total number of lines a user contributed to a repo by their
+        file type.
 
-        :param String repo: URL of a git repo
+        :param str repo: URL of git repo
+        :param str file_type: the extension of the file type, without the '.'
+        :rtype: dict
+        :return: dictionary with file types as keys, and line counts as values
         """
         # cd into the temp folder if we're not there already
-
         # Clone the repo
-
         # cd into the new repo
-
         # Get our total_lines
-
         # cd into temp folder
-
         # Delete our new repo
-
         # Return total_lines
+        line_counts = {}
+        for commit_hash in commits:
+            for file_type in FILE_TYPES.keys():
+                lines = get_lines_from_commit(commit_hash, file_type)
+                line_counts[file_type] = lines
+    
+    def get_lines_for_user(self, username):
+        """
+        Get the total number of lines a user contributed to all repos, by file
+        type.
+
+        :param str username: username of user 
+        """
 
 
 def clone_git_folder(url):
@@ -52,12 +89,14 @@ def clone_git_folder(url):
     except Exception as e:
         print(f"Something went wrong cloning the git folder for url: {url}")
 
-def get_commits(author, start_date=START_DATE):
+def get_commits(author, repo, start_date=START_DATE):
     """
     Gets all commits for an author
 
     :param String author: Author who we are looking for
     :param datetime start_date: The start date (in months) we go back
+    :rtype: list(str)
+    :return: list of commit hashes
     """
     # Build our args
     raw_args = f"git log --date=short --reverse --all " \
@@ -80,7 +119,7 @@ def get_commits(author, start_date=START_DATE):
 
 def get_lines_from_commit(commit_hash, file_type):
     """
-    Get lines added for a spesific file_type and commit_hash
+    Get lines added for a specific file_type and commit_hash
 
     :param String commit_hash: Author who we are looking for
     :param String file_type: Type of file we are looking for (i.e. py)
