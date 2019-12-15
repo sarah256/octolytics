@@ -12,24 +12,24 @@ def class GitClient(object):
     """Git Object we are using to represent interactions with git."""
 
     def get_lines_from_repo(self, repo):
-            """
-            Uses static method clone_git_folder to clone url into temp folder
+        """
+        Uses static method clone_git_folder to clone url into temp folder
 
-            :param String repo: URL of a git repo
-            """
-            # cd into the temp folder if we're not there already
+        :param String repo: URL of a git repo
+        """
+        # cd into the temp folder if we're not there already
 
-            # Clone the repo
+        # Clone the repo
 
-            # cd into the new repo
+        # cd into the new repo
 
-            # Get our total_lines
+        # Get our total_lines
 
-            # cd into temp folder
+        # cd into temp folder
 
-            # Delete our new repo
+        # Delete our new repo
 
-            # Return total_lines
+        # Return total_lines
 
 
 
