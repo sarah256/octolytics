@@ -28,6 +28,7 @@ FILE_TYPES = {
 
 class BadgeMaker(object):
     """Object to make badges for us."""
+
     def make_badge(self, repo_data, file_type):
         """
         Function to make a badge for file_type using repo_data

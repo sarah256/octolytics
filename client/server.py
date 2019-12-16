@@ -36,6 +36,8 @@ DATABASE_SCHEMA = {
     # repo: { repo_name, repo_url }
     'repo_data': None,
     # repo_data: {'judymoses.github.io': {'.py': 50}}
+    'badges': {},
+    # badges: {'.py': svg_file}
 }
 # Create our git_client object
 git_client = GitClient()
@@ -190,6 +192,7 @@ def get_repos():
         render_template('error.html', status_code=500)
     return redirect('/dashboard')
 
+
 @app.route("/badge", methods=['GET'])
 def badge():
     """Endpoint to badge for a certain user in our repo"""
@@ -200,12 +203,19 @@ def badge():
     # Find the user in our database, if not return error badge
     user_data = db_client.find_one({"username": username})
     if user_data and user_data.get('repo_data', {}).get('ALL', None):
-        # Make and return the badge
+        # Check if we already have the badge
+        if user_data['badges'].get(file_type):
+            return user_data['badges'][file_type]
+        # TODO: Check the timestamp it was updated
+        # Make, save and return the badge
         user_badge = badge_maker.make_badge(user_data.get('repo_data').get('ALL'), file_type)
+        user_data['badges'][file_type] = user_badge
+        db_client.update_one({'username': username}, {"$set": user_data}, upsert=False)
         return user_badge
     else:
         # TODO: Change this to error badge image
         return redirect('/')
+
 
 if __name__ == "__main__":
     app.run(ssl_context='adhoc')
