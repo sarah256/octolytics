@@ -3,6 +3,7 @@ import os
 
 # Local Modules
 from client.git_client import GitClient
+from client.badge_maker import BadgeMaker
 
 # 3rd Party Modules
 from flask import Flask, render_template, request, url_for, redirect
@@ -30,13 +31,17 @@ db.authenticate(DB_USER, DB_PASS)
 db_client = db.octolytics_data
 DATABASE_SCHEMA = {
     'username': None,
+    'alias': None,
     'repos': None,
     # repo: { repo_name, repo_url }
     'repo_data': None,
     # repo_data: {'judymoses.github.io': {'.py': 50}}
+    'badges': {},
+    # badges: {'.py': svg_file}
 }
 # Create our git_client object
 git_client = GitClient()
+badge_maker = BadgeMaker()
 
 @app.route("/", methods=['GET'])
 def index():
@@ -69,6 +74,7 @@ def dashboard():
         try:
             data = DATABASE_SCHEMA
             data['username'] = username
+            data['alias'] = [resp['email']]
             db_client.insert_one(data)
         except:
             print(f"[DB]: Something went wrong when updating {username}")
@@ -84,6 +90,39 @@ def login():
     # If not authorized, do the dance
     if not github.authorized:
         return redirect(url_for("github.login"))
+
+    # Sanity check and then display dashboard
+    resp = github.get("/user")
+    if not resp.ok:
+        render_template('error.html', status_code=300)
+    return redirect('/dashboard')
+
+
+@app.route("/add_alias", methods=['POST'])
+def add_alias():
+    """This is for adding alias"""
+    # If not authorized
+    if not github.authorized:
+        return render_template('error.html', status_code=487)
+    # Get the user and pull up their DB info
+    resp = github.get("/user")
+    if not resp.ok:
+        render_template('error.html', status_code=300)
+    resp = resp.json()
+    username = resp['login']
+    # Load in their DB info
+    if db_client.find_one({"username": username}):
+        # Update a users data
+        try:
+            data = db_client.find_one({"username": username})
+            data['alias'].append(request.form['alias'])
+            db_client.update_one({'username': username}, {"$set": data}, upsert=False)
+        except:
+            print(f"[DB]: Something went wrong when getting data for {username}")
+            return render_template('error.html', status_code=487)
+    else:
+        print(f"[DB]: Something went wrong when adding alias for {username}")
+        return render_template('error.html', status_code=487)
 
     # Sanity check and then display dashboard
     resp = github.get("/user")
@@ -108,17 +147,15 @@ def sync_repos():
         # Throw an error
         print(f"[FLASK]: This should not happen. User: {username}")
         render_template('error.html', status_code=500)
-    if not user_data['repo_data']:
-        # Update a users data
-        try:
-            user_data['repo_data'] = git_client.get_all_lines(username, user_data['repos'])
-            db_client.update_one({'username': username}, {"$set": user_data}, upsert=False)
-            return redirect('/dashboard')
-        except:
-            print(f"[GITCLIENT]: Something went wrong when syncing {username}")
-            return render_template('error.html', status_code=487)
-    else:
+    # TODO: Add timeout per user
+    # Update a users data
+    try:
+        user_data['repo_data'] = git_client.get_all_lines(user_data['alias'], user_data['repos'])
+        db_client.update_one({'username': username}, {"$set": user_data}, upsert=False)
         return redirect('/dashboard')
+    except Exception as e:
+        print(f"[GITCLIENT]: Something went wrong when syncing {username}\nException: {e}")
+        return render_template('error.html', status_code=487)
 
 
 @app.route("/get_repos", methods=['GET'])
@@ -154,6 +191,30 @@ def get_repos():
         print(f"[FLASK]: This should not happen. User: {username}")
         render_template('error.html', status_code=500)
     return redirect('/dashboard')
+
+
+@app.route("/badge", methods=['GET'])
+def badge():
+    """Endpoint to badge for a certain user in our repo"""
+    # Extract the user from the url
+    username = request.args.get('username')
+    file_type = request.args.get('file_type')
+
+    # Find the user in our database, if not return error badge
+    user_data = db_client.find_one({"username": username})
+    if user_data and user_data.get('repo_data', {}).get('ALL', None):
+        # Check if we already have the badge
+        if user_data['badges'].get(file_type):
+            return user_data['badges'][file_type]
+        # TODO: Check the timestamp it was updated
+        # Make, save and return the badge
+        user_badge = badge_maker.make_badge(user_data.get('repo_data').get('ALL'), file_type)
+        user_data['badges'][file_type] = user_badge
+        db_client.update_one({'username': username}, {"$set": user_data}, upsert=False)
+        return user_badge
+    else:
+        # TODO: Change this to error badge image
+        return redirect('/')
 
 
 if __name__ == "__main__":

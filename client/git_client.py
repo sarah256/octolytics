@@ -35,22 +35,20 @@ FILE_TYPES = {
 class GitClient(object):
     """Git object we are using to represent interactions with git."""
 
-    def get_lines_for_repo(self, repo, username):
+    def get_lines_for_repo(self, emails):
         """
         Get the total number of lines a user contributed to a repo by their
         file type.
 
-        :param str repo: URL of git repo
-        :param str username: the user we want data on
+        :param list(str) emails: The emails we're looking at
         :rtype: dict
         :return: dictionary with file types as keys, and line counts as values
         """
         line_counts = {}
-        commits = get_commits(username)
+        commits = get_latest_commits(emails)
 
         for commit_hash in commits:
             for file_type in FILE_TYPES.keys():
-                # import pdb; pdb.set_trace()
                 lines = get_lines_from_commit(commit_hash, file_type)
                 line_counts[file_type] = lines
         
@@ -169,7 +167,6 @@ def get_lines_from_commit(commit_hash, file_type):
 
         # Loop over the files, adding lines if they mach file_type
         total_lines = 0
-        import pdb;pdb.set_trace()
         for line in response.split('\\n'):
             # Check if we've passed our next commit
             if next_commit in line:
