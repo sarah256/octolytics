@@ -67,7 +67,7 @@ class GitClient(object):
         """
         if "/temp" not in str(subprocess.run(['pwd'], stdout=subprocess.PIPE).stdout):
             # Change directory
-            os.chdir("client/temp/")
+            os.chdir("octoserver/temp/")
 
             if "/temp" not in str(subprocess.run(['pwd'], stdout=subprocess.PIPE).stdout):
                 raise Exception("Cant cd into /temp Folder")

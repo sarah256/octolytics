@@ -2,4 +2,6 @@ venv/
 *.DS_Store
 .idea/
 *__pycache__/
-client/temp/
+octoserver/temp/
+*.egg-info/
+*.lock

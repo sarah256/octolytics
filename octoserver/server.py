@@ -1,9 +1,12 @@
 # Built-In Modules
 import os
+from datetime import datetime, timedelta
 
 # Local Modules
-from client.git_client import GitClient
-from client.badge_maker import BadgeMaker
+from octoserver.git_client import GitClient
+from octoserver.badge_maker import BadgeMaker
+from octoserver.mailer import Mailer
+from octoserver.config import config
 
 # 3rd Party Modules
 from flask import Flask, render_template, request, url_for, redirect
@@ -38,10 +41,25 @@ DATABASE_SCHEMA = {
     # repo_data: {'judymoses.github.io': {'.py': 50}}
     'badges': {},
     # badges: {'.py': svg_file}
+    'sessions': {
+        'email_code': (-1, datetime(1, 1, 1))
+        # email_code: (code, datetime)
+    }
 }
 # Create our git_client object
 git_client = GitClient()
 badge_maker = BadgeMaker()
+mail_client = Mailer()
+
+
+def main():
+    """Entry point. Parse any args"""
+    # import pdb; pdb.set_trace()
+    if config['debug']:
+        app.debug=True
+
+
+    app.run(ssl_context='adhoc')
 
 @app.route("/", methods=['GET'])
 def index():
@@ -57,6 +75,7 @@ def dashboard():
     if not github.authorized:
         return redirect(url_for("github.login"))
     resp = github.get("/user")
+
     if not resp.ok:
         render_template('error.html', status_code=300)
     resp = resp.json()
@@ -79,9 +98,10 @@ def dashboard():
         except:
             print(f"[DB]: Something went wrong when updating {username}")
             return render_template('error.html', status_code=487)
-    
+
+    kwargs = request.args.get('kwargs', {})
     return render_template('dashboard.html',
-                            data=data,)
+                            data=data, kwargs=kwargs)
 
 
 @app.route("/login", methods=['GET'])
@@ -115,19 +135,53 @@ def add_alias():
         # Update a users data
         try:
             data = db_client.find_one({"username": username})
-            data['alias'].append(request.form['alias'])
+            # Create a random number and email it to the user
+            data = mail_client.send_code(resp['email'], data)
             db_client.update_one({'username': username}, {"$set": data}, upsert=False)
         except:
-            print(f"[DB]: Something went wrong when getting data for {username}")
+            print(f"[DB]: Something went wrong when adding alias for {username}")
             return render_template('error.html', status_code=487)
     else:
         print(f"[DB]: Something went wrong when adding alias for {username}")
         return render_template('error.html', status_code=487)
+    kwargs = {"alias_requested": True}
+    return redirect(f"/dashboard?kwargs={kwargs}")
 
-    # Sanity check and then display dashboard
+
+@app.route("/confirm_alias", methods=['POST'])
+def confirm_alias():
+    """Endpoint to confirm alias is valid"""
+    # If not authorized
+    if not github.authorized:
+        return render_template('error.html', status_code=487)
+    # Get the user and pull up their DB info
     resp = github.get("/user")
     if not resp.ok:
         render_template('error.html', status_code=300)
+    resp = resp.json()
+    username = resp['login']
+    # Load in their DB info and confirm
+    user_data = db_client.find_one({"username": username})
+    if user_data and request.args.get('email'):
+        try:
+            # Confirm the alias is valid, -1 is the default code
+            unconfirmed_code = request.args.get('code', 0)
+            unconfirmed_username = request.args.get('username')
+            user_data = db_client.find_one({"username": username})
+            request_time = user_data['sessions']['email_code'][1]
+            valid_time = True if request_time > (datetime.now() - timedelta(minutes=30)) else False
+            if valid_time and \
+                    unconfirmed_code == user_data['sessions']['email_code'][0] and \
+                    unconfirmed_username == user_data['username']:
+                # Then add the alias and return to dashboard
+                user_data['alias'].append(request.args.get('email'))
+                # Add a cookie to indicate the new alias
+                db_client.update_one({'username': username}, {"$set": user_data}, upsert=False)
+                kwargs = {'new_alias': request.args.get('email')}
+                return redirect(f"/dashboard?kwargs={kwargs}")
+        except:
+            print(f"[DB]: Something went wrong when confirming alias {username}")
+            return render_template('error.html', status_code=487)
     return redirect('/dashboard')
 
 
@@ -215,7 +269,3 @@ def badge():
     else:
         # TODO: Change this to error badge image
         return redirect('/')
-
-
-if __name__ == "__main__":
-    app.run(ssl_context='adhoc')
