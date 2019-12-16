@@ -169,6 +169,7 @@ def get_lines_from_commit(commit_hash, file_type):
 
         # Loop over the files, adding lines if they mach file_type
         total_lines = 0
+        import pdb;pdb.set_trace()
         for line in response.split('\\n'):
             # Check if we've passed our next commit
             if next_commit in line:
