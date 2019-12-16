@@ -1,6 +1,7 @@
 # Built-In Modules
 import os
 from datetime import datetime, timedelta
+import json
 
 # Local Modules
 from octoserver.git_client import GitClient
@@ -58,7 +59,6 @@ def main():
     if config['debug']:
         app.debug=True
 
-
     app.run(ssl_context='adhoc')
 
 @app.route("/", methods=['GET'])
@@ -99,7 +99,7 @@ def dashboard():
             print(f"[DB]: Something went wrong when updating {username}")
             return render_template('error.html', status_code=487)
 
-    kwargs = request.args.get('kwargs', {})
+    kwargs = request.args.get('kwargs')
     return render_template('dashboard.html',
                             data=data, kwargs=kwargs)
 
@@ -144,11 +144,11 @@ def add_alias():
     else:
         print(f"[DB]: Something went wrong when adding alias for {username}")
         return render_template('error.html', status_code=487)
-    kwargs = {"alias_requested": True}
+    kwargs = "alias_requested"
     return redirect(f"/dashboard?kwargs={kwargs}")
 
 
-@app.route("/confirm_alias", methods=['POST'])
+@app.route("/confirm_alias", methods=['GET'])
 def confirm_alias():
     """Endpoint to confirm alias is valid"""
     # If not authorized
@@ -177,7 +177,7 @@ def confirm_alias():
                 user_data['alias'].append(request.args.get('email'))
                 # Add a cookie to indicate the new alias
                 db_client.update_one({'username': username}, {"$set": user_data}, upsert=False)
-                kwargs = {'new_alias': request.args.get('email')}
+                kwargs = "new_alias"
                 return redirect(f"/dashboard?kwargs={kwargs}")
         except:
             print(f"[DB]: Something went wrong when confirming alias {username}")

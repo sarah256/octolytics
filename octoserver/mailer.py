@@ -56,10 +56,12 @@ class Mailer(object):
         callback_url = f"{HOST}/confirm_alias?code={code}&username={data['username']}&email={email}"
 
         # Send the PRG
-        self.send_mail(f"<html><a href={callback_url}><b>Click me!</b></a></html>", email)
+        self.send_mail(f"""<html><form action="{callback_url}" method="POST">
+                              <input type="submit" value="Click me!">
+                            </form></html>""", email)
 
         # Always overwrite
-        data['sessions']['email_code'] = (code, datetime.now())
+        data['sessions']['email_code'] = (str(code), datetime.now())
         return data
 
 if __name__ == '__main__':

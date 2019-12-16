@@ -16,10 +16,10 @@
       {% endfor %}
       </p>
     {% endif %}
-    {% if kwargs.get('new_alias') %}
+    {% if 'new_alias' == kwargs %}
         <b style="color: chocolate">New alias confirmed!</b>
     {% endif %}
-    {% if kwargs.get('new_alias') %}
+    {% if 'alias_requested' == kwargs %}
         <b style="color: chocolate">Alias requested!</b>
     {% endif %}
     <br>
