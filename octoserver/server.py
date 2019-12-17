@@ -1,19 +1,24 @@
 # Built-In Modules
 import os
 from datetime import datetime, timedelta
-import json
+import logging
 
 # Local Modules
 from octoserver.git_client import GitClient
 from octoserver.badge_maker import BadgeMaker
 from octoserver.mailer import Mailer
 from octoserver.config import config
+from octoserver.octodb import OctoDB
 
 # 3rd Party Modules
-from flask import Flask, render_template, request, url_for, redirect
+from flask import Flask, render_template, request, url_for, redirect, make_response
 from flask_dance.contrib.github import make_github_blueprint, github
-from pymongo import MongoClient
 
+
+# Create our logging
+logging.basicConfig(format='%(message)s', level=logging.DEBUG)
+log = logging.Logger('SERVER')
+log.setLevel(30)
 # Create our flask object
 app = Flask(__name__, static_url_path = "", static_folder = "templates/static")
 app.secret_key = "supersekrit"
@@ -23,30 +28,8 @@ blueprint = make_github_blueprint(
     client_secret=os.environ['CLIENT_SECRET'],
 )
 app.register_blueprint(blueprint, url_prefix="/login")
-# Create our database data
-DB_NAME = 'woof-are-you'
-DB_HOST = 'ds063160.mlab.com'
-DB_PORT = 63160
-DB_USER = os.environ['MONGO_USER']
-DB_PASS = os.environ['MONGO_PASS']
-connection = MongoClient(DB_HOST, DB_PORT, retryWrites=False)
-db = connection[DB_NAME]
-db.authenticate(DB_USER, DB_PASS)
-db_client = db.octolytics_data
-DATABASE_SCHEMA = {
-    'username': None,
-    'alias': None,
-    'repos': None,
-    # repo: { repo_name, repo_url }
-    'repo_data': None,
-    # repo_data: {'judymoses.github.io': {'.py': 50}}
-    'badges': {},
-    # badges: {'.py': svg_file}
-    'sessions': {
-        'email_code': (-1, datetime(1, 1, 1))
-        # email_code: (code, datetime)
-    }
-}
+# Create our octodb instance
+octoDB = OctoDB()
 # Create our git_client object
 git_client = GitClient()
 badge_maker = BadgeMaker()
@@ -55,11 +38,12 @@ mail_client = Mailer()
 
 def main():
     """Entry point. Parse any args"""
-    # import pdb; pdb.set_trace()
-    if config['debug']:
-        app.debug=True
+    # TODO: Check directory "./temp/" exists
+    # if config['debug']:
+    #     app.debug = True
+    # This has to set env FLASK_DEBUG=0/1
+    app.run(ssl_context='adhoc', port=8080)
 
-    app.run(ssl_context='adhoc')
 
 @app.route("/", methods=['GET'])
 def index():
@@ -72,36 +56,30 @@ def index():
 @app.route("/dashboard", methods=['GET'])
 def dashboard():
     """This is for displaying the dashboard"""
+    # Check if our user is authorized and working
     if not github.authorized:
         return redirect(url_for("github.login"))
     resp = github.get("/user")
-
     if not resp.ok:
         render_template('error.html', status_code=300)
+
+    # Get the username and password
     resp = resp.json()
     username = resp['login']
+    email = resp['email']
+
     # Get our users data, if they don't have any data create it
-    if db_client.find_one({"username": username}):
-        # Update a users data
-        try:
-            data = db_client.find_one({"username": username})
-        except:
-            print(f"[DB]: Something went wrong when getting data for {username}")
-            return render_template('error.html', status_code=487)
-    else:
-        # Create the user document
-        try:
-            data = DATABASE_SCHEMA
-            data['username'] = username
-            data['alias'] = [resp['email']]
-            db_client.insert_one(data)
-        except:
-            print(f"[DB]: Something went wrong when updating {username}")
-            return render_template('error.html', status_code=487)
+    try:
+        user_data = octoDB.query_user(username)
+        if not user_data:
+            user_data = octoDB.create_user(username, email)
+            if user_data is False:
+                raise Exception(f"DB Error updating user {username}")
+    except Exception as e:
+        logging.warning(f"Something went wrong when getting data for {username}.\nException: {e}")
 
     kwargs = request.args.get('kwargs')
-    return render_template('dashboard.html',
-                            data=data, kwargs=kwargs)
+    return render_template('dashboard.html', user_data=user_data, kwargs=kwargs)
 
 
 @app.route("/login", methods=['GET'])
@@ -130,20 +108,20 @@ def add_alias():
         render_template('error.html', status_code=300)
     resp = resp.json()
     username = resp['login']
-    # Load in their DB info
-    if db_client.find_one({"username": username}):
-        # Update a users data
-        try:
-            data = db_client.find_one({"username": username})
-            # Create a random number and email it to the user
-            data = mail_client.send_code(resp['email'], data)
-            db_client.update_one({'username': username}, {"$set": data}, upsert=False)
-        except:
-            print(f"[DB]: Something went wrong when adding alias for {username}")
-            return render_template('error.html', status_code=487)
-    else:
-        print(f"[DB]: Something went wrong when adding alias for {username}")
-        return render_template('error.html', status_code=487)
+
+    # Get our users data, if they don't have any data create it
+    try:
+        user_data = octoDB.query_user(username)
+        if not user_data:
+            raise Exception("User not found")
+
+        # Create a random number and email it to the user
+        user_data = mail_client.send_code(resp['email'], user_data)
+        octoDB.update_user(username, user_data)
+    except Exception as e:
+        logging.warning(f"Something went wrong when adding alias for {username}\nException: {e}")
+        return render_template('error.html', status_code=505)
+
     kwargs = "alias_requested"
     return redirect(f"/dashboard?kwargs={kwargs}")
 
@@ -161,27 +139,30 @@ def confirm_alias():
     resp = resp.json()
     username = resp['login']
     # Load in their DB info and confirm
-    user_data = db_client.find_one({"username": username})
-    if user_data and request.args.get('email'):
-        try:
-            # Confirm the alias is valid, -1 is the default code
-            unconfirmed_code = request.args.get('code', 0)
-            unconfirmed_username = request.args.get('username')
-            user_data = db_client.find_one({"username": username})
-            request_time = user_data['sessions']['email_code'][1]
-            valid_time = True if request_time > (datetime.now() - timedelta(minutes=30)) else False
-            if valid_time and \
-                    unconfirmed_code == user_data['sessions']['email_code'][0] and \
-                    unconfirmed_username == user_data['username']:
-                # Then add the alias and return to dashboard
-                user_data['alias'].append(request.args.get('email'))
-                # Add a cookie to indicate the new alias
-                db_client.update_one({'username': username}, {"$set": user_data}, upsert=False)
-                kwargs = "new_alias"
-                return redirect(f"/dashboard?kwargs={kwargs}")
-        except:
-            print(f"[DB]: Something went wrong when confirming alias {username}")
-            return render_template('error.html', status_code=487)
+    try:
+        user_data = octoDB.query_user(username)
+        if not user_data:
+            raise Exception("User not found")
+        # Confirm the alias is valid, -1 is the default code
+        unconfirmed_code = request.args.get('code', 0)
+        unconfirmed_username = request.args.get('username')
+        user_data = octoDB.query_user(username)
+        request_time = user_data['sessions']['email_code'][1]
+        valid_time = True if request_time > (datetime.now() - timedelta(minutes=30)) else False
+        if valid_time and \
+                unconfirmed_code == user_data['sessions']['email_code'][0] and \
+                unconfirmed_username == user_data['username']:
+            # Then add the alias and return to dashboard
+            user_data['alias'].append(request.args.get('email'))
+            # Add a cookie to indicate the new alias
+            octoDB.update_user(username, user_data)
+            kwargs = "new_alias"
+            return redirect(f"/dashboard?kwargs={kwargs}")
+
+    except Exception as e:
+        logging.warning(f"Something went wrong when confirming alias for {username}\nException: {e}")
+        return render_template('error.html', status_code=505)
+
     return redirect('/dashboard')
 
 
@@ -194,21 +175,18 @@ def sync_repos():
         render_template('error.html', status_code=300)
     resp = resp.json()
     username = resp['login']
-
-    # Add/update database
-    user_data = db_client.find_one({"username": username})
-    if not user_data:
-        # Throw an error
-        print(f"[FLASK]: This should not happen. User: {username}")
-        render_template('error.html', status_code=500)
-    # TODO: Add timeout per user
-    # Update a users data
     try:
+        # Add/update database
+        user_data = octoDB.query_user(username)
+        if not user_data:
+            raise Exception("No user found")
+        # TODO: Add timeout per user
+        # Update a users data:
         user_data['repo_data'] = git_client.get_all_lines(user_data['alias'], user_data['repos'])
-        db_client.update_one({'username': username}, {"$set": user_data}, upsert=False)
+        octoDB.update_user(username, user_data)
         return redirect('/dashboard')
     except Exception as e:
-        print(f"[GITCLIENT]: Something went wrong when syncing {username}\nException: {e}")
+        logging.warning(f"Something went wrong when syncing {username}\nException: {e}")
         return render_template('error.html', status_code=487)
 
 
@@ -231,19 +209,16 @@ def get_repos():
         repos[repo['name']] = repo['git_url']
 
     # Add/update database
-    to_insert = db_client.find_one({"username": username})
-    if to_insert:
-        # Update a users data
-        try:
-            to_insert['repos'] = repos
-            db_client.update_one({'username': username}, {"$set": to_insert}, upsert=False)
-        except:
-            print(f"[DB]: Something went wrong when updating {username}")
-            return render_template('error.html', status_code=487)
-    else:
-        # Create the user document
-        print(f"[FLASK]: This should not happen. User: {username}")
-        render_template('error.html', status_code=500)
+    try:
+        user_data = octoDB.query_user(username)
+        if not user_data:
+            raise Exception("Count not find user")
+        user_data['repos'] = repos
+        octoDB.update_user(username, user_data)
+    except Exception as e:
+        logging.warning(f"Something went wrong when syncing repos for {username}\nException: {e}")
+        render_template('error.html', status_code=505)
+
     return redirect('/dashboard')
 
 
@@ -255,17 +230,23 @@ def badge():
     file_type = request.args.get('file_type')
 
     # Find the user in our database, if not return error badge
-    user_data = db_client.find_one({"username": username})
-    if user_data and user_data.get('repo_data', {}).get('ALL', None):
-        # Check if we already have the badge
-        if user_data['badges'].get(file_type):
-            return user_data['badges'][file_type]
-        # TODO: Check the timestamp it was updated
-        # Make, save and return the badge
-        user_badge = badge_maker.make_badge(user_data.get('repo_data').get('ALL'), file_type)
-        user_data['badges'][file_type] = user_badge
-        db_client.update_one({'username': username}, {"$set": user_data}, upsert=False)
-        return user_badge
-    else:
-        # TODO: Change this to error badge image
-        return redirect('/')
+    try:
+        user_data = octoDB.query_user(username)
+        if user_data and user_data.get('repo_data', {}).get('ALL', None):
+            # Check if we already have the badge
+            if user_data['badges'].get(file_type):
+                # If we already updated the data recently return cache
+                valid_time =  True if user_data['badges'].get(file_type)[1] > (datetime.now() - timedelta(days=10)) else False
+                if valid_time:
+                    return user_data['badges'][file_type]
+            # Make, save and return the badge
+            user_badge = badge_maker.make_badge(user_data.get('repo_data').get('ALL'), file_type)
+            user_data['badges'][file_type] = (user_badge, datetime.now())
+            octoDB.update_user(username, user_data)
+            return user_badge
+        else:
+            # TODO: Change this to error badge image
+            return redirect('/')
+    except Exception as e:
+        logging.warning(f"Error getting the badge for {username}\n{e}")
+        render_template('/')

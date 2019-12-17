@@ -1,14 +1,15 @@
+<!doctype html>
 <html>
-    <b>Hello {{ data['username'] }}</b>
+    <b>Hello {{ user_data['username'] }}</b>
     <br>
     <form action="/add_alias" method="POST">
       <input type="text" name="alias" value="some@email.com">
       <input type="submit" value="Submit">
     </form>
-    {% if data['alias'] %}
+    {% if user_data['alias'] %}
       <p>You have the following alias'</p>
       <p>
-      {% for alias in data['alias'] %}
+      {% for alias in user_data['alias'] %}
           {{ alias }}
           {% if loop.index != loop.length %}
               ,
@@ -23,9 +24,9 @@
         <b style="color: chocolate">Alias requested!</b>
     {% endif %}
     <br>
-    {% if data['repos'] %}
+    {% if user_data['repos'] %}
       <p>
-      {% for repo_name, repo_url in data['repos'].items() %}
+      {% for repo_name, repo_url in user_data['repos'].items() %}
           {{ repo_name }}
           {% if loop.index != loop.length %}
               ,
@@ -40,9 +41,9 @@
           <input type="submit" value="Get Repos" />
       </form>
     {% endif %}
-    {% if data['repo_data'] %}
+    {% if user_data['repo_data'] %}
       <p>
-      {% for file_type, lines in data['repo_data'].items() %}
+      {% for file_type, lines in user_data['repo_data'].items() %}
           {{ file_type }} - {{ lines }} lines
           {% if loop.index != loop.length %}
               ,

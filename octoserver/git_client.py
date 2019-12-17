@@ -14,7 +14,7 @@ FILE_TYPES = {
     # '.c': 'C',
     # '.cpp': 'C++',
     # '.go': 'Go',
-    # '.html': 'HTML',
+    # '.source': 'HTML',
     # '.css': 'CSS',
     # '.js': 'JavaScript',
     # '.php': 'PHP',
@@ -67,8 +67,7 @@ class GitClient(object):
         """
         if "/temp" not in str(subprocess.run(['pwd'], stdout=subprocess.PIPE).stdout):
             # Change directory
-            os.chdir("octoserver/temp/")
-
+            os.chdir("./temp/")
             if "/temp" not in str(subprocess.run(['pwd'], stdout=subprocess.PIPE).stdout):
                 raise Exception("Cant cd into /temp Folder")
 
@@ -174,13 +173,13 @@ def get_lines_from_commit(commit_hash, file_type, emails):
 
     try:
         # Call the git module to get the number of lines changed
-        response = str(subprocess.run(new_args, stdout=subprocess.PIPE).stdout)
+        response = subprocess.Popen(new_args, stdout=subprocess.PIPE)
 
         # Loop over files and count lines
         total_lines = 0
         add_to_lines = False
         while True:
-            line = response.stdout.readline()
+            line = str(response.stdout.readline())
             if not line:
                 break
             line = line.replace("\n", "").replace("\t", " ")
@@ -189,14 +188,11 @@ def get_lines_from_commit(commit_hash, file_type, emails):
             elif '---' in line:
                 add_to_lines = False
             if add_to_lines and '---' not in line and line.endswith(file_type):
-                #TODO: handle case when commit message/line may end in file extension
-                # Extract the number of lines added (i.e. the first number)
-                # Get the first number and add to total_lines
                 total_lines += int(line.split(" ")[0])
 
         return total_lines
     except Exception as e:
-        print(f"Something went wrong when getting the lines for hash {commit_hash}")
+        print(f"Something went wrong when getting the lines for hash {commit_hash}\nException{e}")
         return -1
 
 
