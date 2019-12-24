@@ -4,11 +4,10 @@ from datetime import datetime, timedelta
 import logging
 
 # Local Modules
-from octoserver.git_client import GitClient
-from octoserver.badge_maker import BadgeMaker
-from octoserver.mailer import Mailer
-from octoserver.config import config
-from octoserver.octodb import OctoDB
+from octolytics.git_client import GitClient
+from octolytics.badge_maker import BadgeMaker
+from octolytics.mailer import Mailer
+from octolytics.octodb import OctoDB
 
 # 3rd Party Modules
 from flask import Flask, render_template, request, url_for, redirect, make_response
@@ -39,8 +38,8 @@ mail_client = Mailer()
 def main():
     """Entry point. Parse any args"""
     # TODO: Check directory "./temp/" exists
-    # if config['debug']:
-    #     app.debug = True
+    # if app.config['DEBUG']:
+    #     app.config['DEBUG'] = True
     # This has to set env FLASK_DEBUG=0/1
     app.run(ssl_context='adhoc', port=8080)
 
