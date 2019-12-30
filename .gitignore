@@ -5,3 +5,5 @@ venv/
 octolytics/temp/
 *.egg-info/
 *.lock
+env_vars.sh
+.vscode

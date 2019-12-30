@@ -4,10 +4,10 @@ from datetime import datetime, timedelta
 import logging
 
 # Local Modules
-from octolytics.git_client import GitClient
-from octolytics.badge_maker import BadgeMaker
-from octolytics.mailer import Mailer
-from octolytics.octodb import OctoDB
+from git_client import GitClient
+from badge_maker import BadgeMaker
+# from mailer import Mailer
+from octodb import OctoDB
 
 # 3rd Party Modules
 from flask import Flask, render_template, request, url_for, redirect, make_response
@@ -32,7 +32,7 @@ octoDB = OctoDB()
 # Create our git_client object
 git_client = GitClient()
 badge_maker = BadgeMaker()
-mail_client = Mailer()
+# mail_client = Mailer()
 
 
 def main():
@@ -249,3 +249,6 @@ def badge():
     except Exception as e:
         logging.warning(f"Error getting the badge for {username}\n{e}")
         render_template('/')
+
+if __name__ == "__main__":
+    app.run()
